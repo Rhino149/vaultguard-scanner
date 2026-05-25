@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaultGuard | Cloud Breach Scanner</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        :root {
+            --bg: #09090b; --surface: #18181b; --primary: #06b6d4; 
+            --primary-glow: rgba(6, 182, 212, 0.4); --danger: #ef4444; 
+            --danger-glow: rgba(239, 68, 68, 0.2); --success: #10b981; 
+            --text: #f4f4f5; --text-muted: #a1a1aa; --border: #3f3f46;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top, #1f1f22 0%, var(--bg) 100%);
+            color: var(--text); display: flex; justify-content: center;
+            align-items: center; min-height: 100vh; margin: 0; padding: 2rem;
+            box-sizing: border-box;
+        }
+
+        .app-container {
+            background: rgba(24, 24, 27, 0.7); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); padding: 2.5rem;
+            border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 100%; max-width: 900px;
+        }
+
+        .header { text-align: center; margin-bottom: 2.5rem; }
+        .header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; background: linear-gradient(to right, #fff, var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header p { color: var(--text-muted); margin-top: 0.5rem; }
+
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.5rem;
+        }
+
+        .card h3 { margin-top: 0; color: var(--primary); }
+
+        input[type="file"], input[type="password"] {
+            width: 100%; padding: 0.85rem; margin-top: 1rem;
+            background: #000; border: 1px solid var(--border);
+            color: var(--text); border-radius: 8px; box-sizing: border-box; font-family: inherit;
+        }
+        input:focus { outline: none; border-color: var(--primary); }
+
+        button {
+            width: 100%; padding: 0.85rem; margin-top: 1rem;
+            background: var(--primary); color: #000; border: none;
+            border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+        }
+        button:hover:not(:disabled) { box-shadow: 0 0 15px var(--primary-glow); }
+        button:disabled { background: var(--border); color: #71717a; cursor: not-allowed; }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px);
+            display: none; justify-content: center; align-items: center; z-index: 9999;
+        }
+        .modal {
+            background: var(--surface); border: 1px solid var(--danger);
+            padding: 2.5rem; border-radius: 16px; max-width: 450px; text-align: center;
+        }
+        .modal h2 { color: var(--danger); margin-top: 0; }
+        .btn-danger { background: var(--danger); color: white; margin-top: 1.5rem; }
+
+        /* Progress Bar */
+        .progress-wrapper { width: 100%; background: #000; border-radius: 8px; margin-top: 1rem; display: none; overflow: hidden; border: 1px solid var(--border); }
+        .progress-bar { height: 8px; background: var(--primary); width: 0%; transition: width 0.2s; }
+        .progress-text { font-size: 0.8rem; color: var(--primary); margin-top: 0.5rem; text-align: center; font-weight: bold; }
+
+        /* Table */
+        .results-container { margin-top: 2rem; display: none; max-height: 400px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; background: var(--surface); }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { background: #000; color: var(--text-muted); position: sticky; top: 0; }
+        .status-breached { color: var(--danger); font-weight: 600; }
+        .status-safe { color: var(--success); }
+    </style>
+</head>
+<body>
+
+    <div class="modal-overlay" id="warningModal">
+        <div class="modal">
+            <h2>⚠️ SECURITY WARNING</h2>
+            <p style="color: var(--text-muted);">You are loading an unencrypted file containing all your passwords. This app scrambles them locally using mathematical k-Anonymity before checking them.</p>
+            <p style="color: white; font-weight: bold;">You must permanently delete your .csv file IMMEDIATELY after using this tool.</p>
+            <button class="btn-danger" id="acceptWarningBtn">I Understand & Will Delete It</button>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <div class="header">
+            <h1>VaultGuard Cloud</h1>
+            <p>100% Private, Zero-Knowledge Data Breach Scanner</p>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>⚡ Single Password</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Instantly verify a single password against the global breach database.</p>
+                <input type="password" id="singlePassInput" placeholder="Enter password...">
+                <button id="singleCheckBtn">Check Password</button>
+                <div id="singleResult" style="margin-top: 1rem; text-align: center; font-weight: 600;"></div>
+            </div>
+
+            <div class="card">
+                <h3>📂 Bulk Vault Scan (.CSV)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Export your passwords from Chrome/Safari/Edge. We'll scan them line-by-line.</p>
+                <input type="file" id="csvInput" accept=".csv">
+                <button id="scanCsvBtn" disabled>Scan Vault</button>
+                
+                <div class="progress-wrapper" id="progressWrapper">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="progress-text" id="progressText" style="display: none;">Scanning: 0 / 0</div>
+            </div>
+        </div>
+
+        <div class="results-container" id="resultsContainer">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Account</th>
+                        <th>Status</th>
+                        <th>Breaches</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const warningModal = document.getElementById('warningModal');
+        const acceptWarningBtn = document.getElementById('acceptWarningBtn');
+        const csvInput = document.getElementById('csvInput');
+        const scanCsvBtn = document.getElementById('scanCsvBtn');
+        const singlePassInput = document.getElementById('singlePassInput');
+        const singleCheckBtn = document.getElementById('singleCheckBtn');
+        const singleResult = document.getElementById('singleResult');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultsBody = document.getElementById('resultsBody');
+        const progressWrapper = document.getElementById('progressWrapper');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+
+        let csvFile = null;
+
+        // --- SHA-1 Hashing Engine ---
+        async function getSha1Hash(text) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        }
+
+        // --- Secure API Fetcher (k-Anonymity) ---
+        async function checkHashAgainstAPI(fullHash) {
+            const prefix = fullHash.substring(0, 5);
+            const suffix = fullHash.substring(5);
+            
+            try {
+                const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+                if (!response.ok) return { compromised: false, count: 0, error: true };
+                
+                const textData = await response.text();
+                for (let line of textData.split(/\r?\n/)) {
+                    if (line.startsWith(suffix)) {
+                        return { compromised: true, count: line.split(':')[1], error: false };
+                    }
+                }
+                return { compromised: false, count: 0, error: false };
+            } catch (e) {
+                return { compromised: false, count: 0, error: true };
+            }
+        }
+
+        // --- SINGLE CHECK ---
+        singleCheckBtn.addEventListener('click', async () => {
+            const password = singlePassInput.value;
+            if (!password) return;
+
+            singleCheckBtn.disabled = true;
+            singleCheckBtn.innerText = "Hashing...";
+
+            const fullHash = await getSha1Hash(password);
+            
+            singleCheckBtn.innerText = "Querying Database...";
+            const result = await checkHashAgainstAPI(fullHash);
+
+            if (result.error) {
+                singleResult.innerText = "❌ Network Error";
+            } else if (result.compromised) {
+                singleResult.style.color = 'var(--danger)';
+                singleResult.innerText = `⚠️ COMPROMISED (${parseInt(result.count).toLocaleString()} breaches)`;
+            } else {
+                singleResult.style.color = 'var(--success)';
+                singleResult.innerText = '✅ SAFE (0 breaches)';
+            }
+            
+            singleCheckBtn.disabled = false;
+            singleCheckBtn.innerText = "Check Password";
+        });
+
+        // --- BULK CSV CHECK ---
+        csvInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                warningModal.style.display = 'flex';
+            }
+        });
+
+        acceptWarningBtn.addEventListener('click', () => {
+            warningModal.style.display = 'none';
+            csvFile = csvInput.files[0];
+            if (csvFile) scanCsvBtn.disabled = false;
+        });
+
+        scanCsvBtn.addEventListener('click', async () => {
+            scanCsvBtn.disabled = true;
+            csvInput.disabled = true;
+            
+            resultsContainer.style.display = 'block';
+            resultsBody.innerHTML = '';
+            progressWrapper.style.display = 'block';
+            progressText.style.display = 'block';
+
+            const text = await csvFile.text();
+            const lines = text.split(/\r?\n/);
+            if (lines.length < 2) return;
+
+            const header = lines[0].toLowerCase().split(',');
+            const urlIdx = header.findIndex(h => h.includes('url') || h.includes('name'));
+            const userIdx = header.findIndex(h => h.includes('username') || h.includes('login'));
+            const passIdx = header.findIndex(h => h.includes('password'));
+
+            if (passIdx === -1) {
+                alert("Error: No 'password' column found in this CSV.");
+                resetUI();
+                return;
+            }
+
+            // Extract all valid passwords to process
+            let targets = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
+                let rawPass = row[passIdx] ? row[passIdx].replace(/^"|"$/g, '') : '';
+                
+                if (rawPass) {
+                    targets.push({
+                        url: (row[urlIdx] || 'Unknown').replace(/^"|"$/g, ''),
+                        user: (row[userIdx] || 'Unknown').replace(/^"|"$/g, ''),
+                        pass: rawPass
+                    });
+                }
+            }
+
+            const total = targets.length;
+            
+            // --- THE THROTTLED LOOP ---
+            for (let i = 0; i < total; i++) {
+                const target = targets[i];
+                
+                // Update UI
+                progressText.innerText = `Scanning: ${i + 1} / ${total}`;
+                progressBar.style.width = `${((i + 1) / total) * 100}%`;
+
+                // Hash & Check
+                const fullHash = await getSha1Hash(target.pass);
+                const result = await checkHashAgainstAPI(fullHash);
+
+                // Build Table Row
+                const tr = document.createElement('tr');
+                if (result.error) {
+                    tr.innerHTML = `<td>${target.url}</td><td>${target.user}</td><td style="color:var(--text-muted)">Skipped (Rate Limit)</td><td>-</td>`;
+                    resultsBody.appendChild(tr);
+                } else if (result.compromised) {
+                    tr.innerHTML = `<td>${target.url}</td><td>${target.user}</td><td class="status-breached">⚠️ Breached</td><td>${parseInt(result.count).toLocaleString()}</td>`;
+                    // Push compromised accounts to the top of the table
+                    resultsBody.insertBefore(tr, resultsBody.firstChild);
+                } else {
+                    tr.innerHTML = `<td>${target.url}</td><td>${target.user}</td><td class="status-safe">✅ Safe</td><td>0</td>`;
+                    resultsBody.appendChild(tr);
+                }
+
+                // CRITICAL: The API Throttler. Wait 250ms between requests to prevent IP bans.
+                await new Promise(resolve => setTimeout(resolve, 250));
+            }
+
+            progressText.innerText = "Scan Complete!";
+            progressBar.style.background = "var(--success)";
+            resetUI();
+        });
+
+        function resetUI() {
+            scanCsvBtn.disabled = false;
+            csvInput.disabled = false;
+            scanCsvBtn.innerText = "Scan Another CSV";
+        }
+    </script>
+</body>
+</html>
